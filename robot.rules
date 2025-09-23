@@ -1,0 +1,1 @@
+SUBSYSTEM=="input",KERNELS=="event5",ACTION=="add",RUN+="/bin/systemctl start robot.service"
