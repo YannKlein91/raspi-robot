@@ -9,8 +9,8 @@ Lancement du programme la connexion de la manette xbox :
 La règle (robot.rules) lance le service (robot.service) qui lance le script (robot.sh) qui lance le programme (robot.py)
 
 commandes utiles :
-sudo nano /etc/systemd/system/robot.service (modifier le fichier service)
-sudo systemctl daemon-reload (relance les services)
-sudo systemctl status robot (voir le status du service)
+  *  sudo nano /etc/systemd/system/robot.service (modifier le fichier service)
+  *  sudo systemctl daemon-reload (relance les services)
+  *  sudo systemctl status robot (voir le status du service)
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
