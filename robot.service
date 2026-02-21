@@ -1,0 +1,11 @@
+[Unit]
+Description=robot boot Service
+After=udev.service
+
+[Service]
+Type=simple
+User=yann
+ExecStart=/home/yann/raspi-robot/robot.sh
+
+[Install]
+WantedBy=multi-user.target
