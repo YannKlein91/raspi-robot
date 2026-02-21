@@ -1,17 +1,15 @@
 # --------------- imports --------------- #
-import gpiod # in venv, pip install gpiod
+#import gpiod # in venv, pip install gpiod
 #from gpiod.line import Direction, Value
-from adafruit_servokit import ServoKit
-from evdev import InputDevice, ecodes
-import time
-import os
-# --------------- constantes + variables globales --------------- #
+#from adafruit_servokit import ServoKit
+#from evdev import InputDevice, ecodes
+#import time
+#import os
 
-kit = ServoKit(channels=16)
 
-# --------------- Fonction principal du Programme --------------- #
 
-def GO():
+"""
+def Start():
     print("RCCARE ON")
     kit.servo[0].angle = 90
     kit.servo[2].angle = 90
@@ -40,7 +38,7 @@ def GO():
                 kit.servo[0].angle = 90
                 
                 
-        """
+        
         elif event.code == ecodes.ABS_Y and event.value != 0:    
             kit.servo[0].angle = 90
         
@@ -56,7 +54,7 @@ def GO():
             elif event.value > 50000:
                 ServoDirection("d")
             else :
-                ServoDirection("m")"""
+                ServoDirection("m")
 
 # --------------- PROPULSION --------------- #
 
@@ -91,12 +89,12 @@ def ServoDirection(key):
     else :
         DIRECTION(90)
 
+"""
 
 
-
-GO()
 
 """
+
 #from gpiozero import AngularServo
 #from sshkeyboard import listen_keyboard
 #import evdev

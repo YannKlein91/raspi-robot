@@ -1,5 +1,5 @@
-from evdev import InputDevice, ecodes
-from sshkeyboard import listen_keyboard
+from evdev import InputDevice, ecodes # manette xbox
+#from sshkeyboard import listen_keyboard # clavier
 from gpiozero import  Motor, PWMOutputDevice
 
 import time
@@ -7,14 +7,128 @@ import sys
 import os
 import ledControl
 
+pLeft ='left'
+pRight = 'right'
 
-motor1 = Motor(forward=17,backward=22)
-pwm1 = PWMOutputDevice(27)
-pwm1.value = 0
+pMotorL = Motor(forward=17,backward=22)
+pPwmL = PWMOutputDevice(27)
+pPwmL.value = 0
 
-motor2 = Motor(forward=23,backward=24)
-pwm2 = PWMOutputDevice(25)
-pwm2.value = 0
+pMotorR = Motor(forward=23,backward=24)
+pPwmR = PWMOutputDevice(25)
+pPwmR.value = 0
+
+pSPEED = 0 # valeur comprise entre 0 et 1
+
+def Start():
+        try:
+            ledControl.TurnLed(ledControl.Rouge,True)
+            #ledControl.Rouge.value = True
+            print("MARCHE ON")
+            #  listen_keyboard(on_press=on_key_press) # clavier
+            Controller()
+        except KeyboardInterrupt:
+            Close()
+        finally:
+            Close()
+
+def Controller():
+            global pSPEED
+            pSPEED = ledControl.MinimalSpeed()
+
+            #connexion à la manette
+            file_path = '/dev/input/event5'
+            while (os.path.exists(file_path) == False):
+                print('manette non connectée')
+                time.sleep(5)
+            dev = InputDevice('/dev/input/event5')
+            print('manette connectée')
+            #lecture des touches
+            for event in dev.read_loop():
+                
+                #joystick droit
+                if event.code == ecodes.ABS_RZ: 
+                    #joystick au milieu
+                    if(event.value > 30000 and event.value < 40000): 
+                        Stop(leftRight=pRight)
+                    #joystick actionné
+                    else: 
+                        GO(leftRight=pRight,value=event.value)
+                
+                #joystick gauche
+                elif event.code == ecodes.ABS_Y:   
+                    #joystick au milieu
+                    if(event.value > 30000 and event.value < 40000): 
+                        Stop(leftRight=pLeft)
+                    #joystick actionné
+                    else:  
+                        GO(leftRight=pLeft,value=event.value)
+
+                #bouton RB appuyé
+                elif event.code == ecodes.BTN_TR and event.value == 1: 
+                    pSPEED = ledControl.SpeedIndicator(True)
+                    print(pSPEED)
+                
+                #bouton LB appuyé
+                elif event.code == ecodes.BTN_TL and event.value == 1: 
+                    pSPEED = ledControl.SpeedIndicator(False)
+                    print(pSPEED)
+
+                #bouton start appuyé
+                elif event.code == ecodes.BTN_START and event.value == 1: 
+                    Close(shutdown = True)
+
+                #bouton select appuyé
+                elif event.code == ecodes.BTN_SELECT and event.value == 1: 
+                    Close()
+
+def GO(leftRight, value):
+    # moteur gauche ou droite
+    if(leftRight == pLeft):
+        pwm = pPwmL  
+        motor = pMotorL
+    else:
+        pwm = pPwmR  
+        motor = pMotorR
+    # vitesse
+    speed = 0
+    while(speed < pSPEED):
+        speed = speed+0.1
+        if(speed > 1):
+             speed = 1.0
+        pwm.value = speed
+        time.sleep(0.001)
+        print(leftRight,' speed :',speed)
+    # direction
+    if(value > 30000):
+        motor.backward()
+    else:
+        motor.forward()
+
+def Stop(leftRight):
+    # moteur gauche ou droite
+    if(leftRight == pLeft):
+        pPwmL.value = 0
+        pMotorL.stop()
+    else:
+        pPwmR.value = 0
+        pMotorR.stop()
+
+def Close(shutdown = False):
+        Stop(leftRight=pRight)
+        Stop(leftRight=pLeft)
+        ledControl.LedsOff()
+        print("MARCHE OFF")
+        if(shutdown == True):
+            # éteindre raspi
+            os.system('sudo shutdown now') 
+        else:
+            # quitter le programme
+            sys.exit() 
+
+if __name__ == "__main__":
+    Start()
+
 
 
 """
@@ -27,78 +141,26 @@ motor4 = motor.DCMotor(pca.channels[0], pca.channels[1])
 motor4.decay_mode = motor.SLOW_DECAY
 """
 
-def Start():
-    try:
-        print("MARCHE ON")
-        ledControl.Led(ledControl.rouge,True)
-        # listen_keyboard(on_press=on_key_press)
-        file_path = '/dev/input/event5'
-        while (os.path.exists(file_path) == False):
-            print('manette non connectée')
-            time.sleep(5)
-
-        dev = InputDevice('/dev/input/event5')
-        print('manette connectée : A => avancer / B => reculer / joystick gauche => direction')
-        for event in dev.read_loop():
-            if event.code == ecodes.ABS_Y: #joystick droit
-                if(event.value > 30000 and event.value < 40000):
-                    RightStop()
-                else:
-                    RightGo(event.value)
-            
-            elif event.code == ecodes.ABS_RZ:   #joystick gauche
-                if(event.value > 30000 and event.value < 40000):
-                    LeftStop()
-                else:
-                    LeftGo(event.value)
-
-            elif event.code == ecodes.BTN_TR and event.value == 1: #bouton RB
-                ledControl.SpeedIndicator(True)
-                
-            elif event.code == ecodes.BTN_TL and event.value == 1: #bouton LB
-                ledControl.SpeedIndicator(False)
-
-            elif event.code == ecodes.BTN_START and event.value == 1: #bouton start
-                Close()
-    
-        ledControl.Led(ledControl.rouge,False)
-
-    except KeyboardInterrupt:
-        Close()
-    finally:
-        Close()
+"""
 
 
 def LeftGo(value):
-    pwm2.value = 0.7
+    pwm2.value = SPEED
+    print('left speed :',SPEED)
     if(value > 30000):
-        motor2.backward()
-    else:
         motor2.forward()
+    else:
+        motor2.backward()
 
 def RightGo(value):
-    pwm1.value = 1
+    pwm1.value = SPEED
+    print('right speed :',SPEED)
     if(value > 30000):
         motor1.forward()
     else:
         motor1.backward()
 
-def LeftStop():
-    pwm2.value = 0
-    motor2.stop()
-
-def RightStop():
-    pwm1.value = 0
-    motor1.stop()
-
-def Close():
-        LeftStop()
-        RightStop()
-        ledControl.LedsOff()
-        print("MARCHE OFF")
-
-"""
-def on_key_press(key):
+def on_key_press(key):  # clavier
     print(f"press : {key}")
     if(key == "z"):
         pwm2.value = 0.5
@@ -123,17 +185,6 @@ def on_key_press(key):
         sys.exit()
 
 """
-
-
-
-
-
-
-
-
-
-
-
 
 """
 
