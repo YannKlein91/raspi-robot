@@ -12,5 +12,8 @@ commandes utiles :
   *  sudo nano /etc/systemd/system/robot.service (modifier le fichier service)
   *  sudo systemctl daemon-reload (relance les services)
   *  sudo systemctl status robot (voir le status du service)
+  *  lib adafruit_servokit => pip3 install adafruit-circuitpython-servokit
+  *  lib sshkeyboard => pip3 install sshkeyboard
+  
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
