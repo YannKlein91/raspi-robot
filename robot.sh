@@ -1,10 +1,10 @@
 #!/bin/bash
 echo "DEBUT ACTIVATION ENV"
 which python
-cd home/yann/raspi-robot/env
+cd home/yann/raspi-robot/venv
 pwd
 activate() {
-.  home/yann/raspi-robot/env/bin/activate
+.  home/yann/raspi-robot/venv/bin/activate
 }
 activate
 which python

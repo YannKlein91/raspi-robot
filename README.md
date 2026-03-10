@@ -14,6 +14,9 @@ commandes utiles :
   *  sudo systemctl status robot (voir le status du service)
   *  lib adafruit_servokit => pip3 install adafruit-circuitpython-servokit
   *  lib sshkeyboard => pip3 install sshkeyboard
+
+Notes :
+  * En cas de problème de connexion ssh depuis visual => supprimer le dossier /Home/<user>/.vscode-server 
   
 
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
