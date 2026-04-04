@@ -1,48 +1,46 @@
-from adafruit_servokit import ServoKit
-import time
+from adafruit_servokit import ServoKit # gestion servo-moteurs
+import time # temps
 from sshkeyboard import listen_keyboard # clavier
-import sys
-from hexapodLeg import Leg
+import sys # system
+from hexapodLeg import Leg # definition des pattes
 from evdev import InputDevice, ecodes, evtest # manette xbox
-import threading
-import os
+import threading # threading
+import os # system linux
 
 '''
-    limites de coordonnées
+    limites + tests de coordonnées (unité mm): https://www.desmos.com/calculator/2uzkupqa2t?lang=fr
     x =  entre -150 et 150 théorique, entre -80 à 80 pour ne pas s'entrechoquer les pattes en marchant
-    y = entre 60 et 200
-    z = 50 # 50 entre 150 et 30 avec y = 150
+    y = entre 110 et 250
+    z = entre 200 et -200
 '''
 
 # --------------- constantes + variables globales --------------- #
 
-
 Right = ServoKit(channels=16 , address=0x40)
-Left = ServoKit(channels=16 , address=0x41, reference_clock_speed=35000000) #original value => reference_clock_speed=25000000 OK
+Left = ServoKit(channels=16 , address=0x41, reference_clock_speed=35000000) #valeur d'origine => reference_clock_speed=25000000 
 
-coxaMin = 35
-coxaMax = 145
-
-femurMin = 0
-femurMax = 90
-
-tibiaMin = 5
-tibiaMax = 150
+cLenghtX = 30 # longueur d'un pas
+cEcartY = 150 # écratement des pattes
 
 STARTSTOP = False
+INVERTED = False
 
 # --------------- Liste des 6 pattes --------------- #
 
-LegFL = Leg(True,Left.servo[8],Left.servo[9],Left.servo[10],+1)
-LegML = Leg(True,Left.servo[4],Left.servo[5],Left.servo[6],0)
-LegBL = Leg(True,Left.servo[0],Left.servo[1],Left.servo[2],-1)
+LegFL = Leg(1,Left.servo[8],Left.servo[9],Left.servo[10])
+LegML = Leg(3,Left.servo[4],Left.servo[5],Left.servo[6])
+LegBL = Leg(5,Left.servo[0],Left.servo[1],Left.servo[2])
 
-LegFR = Leg(False,Right.servo[8],Right.servo[9],Right.servo[10],+1)
-LegMR = Leg(False,Right.servo[4],Right.servo[5],Right.servo[6],0)
-LegBR = Leg(False,Right.servo[0],Right.servo[1],Right.servo[2],-1) 
+LegFR = Leg(2,Right.servo[8],Right.servo[9],Right.servo[10])
+LegMR = Leg(4,Right.servo[4],Right.servo[5],Right.servo[6])
+LegBR = Leg(6,Right.servo[0],Right.servo[1],Right.servo[2]) 
 
 
 def Controller():
+    '''
+    gestion de la manette Xbox
+
+    '''
     #connexion à la manette
     file_path = '/dev/input/event5'
     while (os.path.exists(file_path) == False):
@@ -52,76 +50,164 @@ def Controller():
     print('manette connectée')
 
     #evtest.main() # test lecture de la manette
-
     global STARTSTOP
+    global INVERTED
+
+    tWalk = threading.Thread(target=Walk, args=())
+    tSwim = threading.Thread(target=Swim, args=())
+    tCrab = threading.Thread(target=CrabWalk, args=())
+    
     #lecture des touches
     for event in dev.read_loop():
         #joystick gauche
         if event.code == ecodes.ABS_Y:   
             #joystick au milieu
             if(event.value > 30000 and event.value < 40000): 
+               joystickG = 4
+        #boutons standards
+        elif(event.value != 0):
+            # A
+            if event.code == ecodes.BTN_A: 
+                if(tWalk.is_alive() == False):
+                    STARTSTOP = True
+                    INVERTED = False
+                    tWalk.start()
+            # X
+            if event.code == ecodes.BTN_X: 
+                if(tWalk.is_alive() == False):
+                    STARTSTOP = True
+                    INVERTED = True
+                    tWalk.start()
+            # B
+            if event.code == ecodes.BTN_B: 
                 STARTSTOP = False
-            #joystick actionné
-            else:  
-                STARTSTOP = True
-                Walk()
-        if event.code == ecodes.BTN_A: 
-            STARTSTOP = False
+                if(tWalk.is_alive() == True):
+                    tWalk.join()
+                    tWalk = threading.Thread(target=Walk, args=())
+                if(tSwim.is_alive() == True):
+                    tSwim.join()
+                    tSwim = threading.Thread(target=Swim, args=())
+                if(tCrab.is_alive() == True):
+                    tCrab.join()
+                    tCrab = threading.Thread(target=CrabWalk, args=())
+            # Y
+            if event.code == ecodes.BTN_Y: 
+                if(tSwim.is_alive() == False):
+                    STARTSTOP = True
+                    INVERTED = False
+                    tSwim.start()            
+            # START
+            if event.code == ecodes.BTN_START:
+                Init(False)
+                sys.exit()
+            # SELECT
+            if event.code == ecodes.BTN_SELECT:
+                select = 1
+            # croix haut / bas
+            if event.code == ecodes.ABS_HAT0Y:
+                if(event.value == 1):
+                    Grounded(False)
+                else:
+                    Grounded(True)
+            # croix gauche / droite
+            if event.code == ecodes.ABS_HAT0X:
+                if(event.value == 1):
+                    if(tCrab.is_alive() == False):
+                        STARTSTOP = True
+                        INVERTED = False
+                        tCrab.start()
+                else:
+                    gauche=-1
     
-
 def Walk():
     """
-    tests de mouvements (unité mm)
+    marche avant / arrère 
         
     """
     print("commence à marcher")
-    y = 70 #écartement des pattes
-    x = 50 #longueur de pas
     global STARTSTOP
-    # position initial au sol
-    Grounded() # 0,100,50
-    
-    # se relever
-    MoveSelectedLegs([([1,2,3,4,5,6],0,y,110)])
-
-    time.sleep(1)
-    
+    global INVERTED
+    y = cEcartY #écartement des pattes
+    x = cLenghtX #longueur de pas
+    if(INVERTED == True):
+        x = -x
+    zp = -100
+    zl = -60
     #leve les pattes 2 3 6 pose 1 4 5 (déjà posé au départ)
-    MoveSelectedLegs([([2,3,6],0,y,50),([1,4,5],0,y,110)])
-
-    while(STARTSTOP == True):
-
+    MoveSelectedLegs([([2,3,6],0,y,-60),([1,4,5],0,y,zp)])
+    while STARTSTOP == True:
         #avance les pattes 2 3 6 et recule 1 4 5
-        MoveSelectedLegs([([2,3,6],x,y,50),([1,4,5],-x,y,110)])
-
-        #pose les pattes 2 3 6 et leve 1 4 5
-        MoveSelectedLegs([([2,3,6],x,y,110),([1,4,5],-x,y,50)])
-
+        MoveSelectedLegs([([2,3,6],x,y,zl),([1,4,5],-x,y,zp)])
+        #pose les pattes 2 3 6 
+        MoveSelectedLegs([([2,3,6],x,y,zp)])
+        #leve 1 4 5
+        MoveSelectedLegs([([1,4,5],-x,y,zl)])
         #recule les pattes 2 3 6 et avance 1 4 5
-        MoveSelectedLegs([([2,3,6],-x,y,110),([1,4,5],x,y,50)])
-
-        # pose les pattes 1 4 5 et leve 2 3 6
-        MoveSelectedLegs([([1,4,5],x,y,110),([2,3,6],-x,y,50)])
-
-
-    
+        MoveSelectedLegs([([2,3,6],-x,y,zp),([1,4,5],x,y,zl)])
+        #pose les pattes 1 4 5
+        MoveSelectedLegs([([1,4,5],x,y,zp)])
+        #leve 2 3 6
+        MoveSelectedLegs([([2,3,6],-x,y,zl)])
+    Grounded(True)
     print("fini de marcher")
 
+def Swim():
+    '''
+    nage la brasse
 
-def Grounded():
+    '''
+    print("commence à nager")
+    global STARTSTOP
+    global INVERTED
+    y = cEcartY #écartement des pattes
+    x = cLenghtX #longueur de pas
+    while STARTSTOP == True:
+        #avance les pattes 2 3 6 et recule 1 4 5
+        MoveSelectedLegs([([2,3,6],x,y,0),([1,4,5],x,y,0)])
+        #recule les pattes 2 3 6 et avance 1 4 5
+        MoveSelectedLegs([([2,3,6],-x,y,0),([1,4,5],-x,y,0)])
+    print("fini de nager")
+
+def CrabWalk():
+    '''
+    marche latérale gauche / droite
+
+    '''
+    print("commence à marcher en crab")
+    global STARTSTOP
+    global INVERTED
+    yMin = 60 
+    yMax = 100
+    x = 0 #longueur de pas
+    #if(INVERTED == True):
+    #    y = -y
+    #leve les pattes 2 3 6 pose 1 4 5 (déjà posé au départ)
+    MoveSelectedLegs([([2,3,6],0,cEcartY,50),([1,4,5],0,cEcartY,110)])
+    while STARTSTOP == True:
+        #avance les pattes 2 3 6 et recule 1 4 5
+        MoveSelectedLegs([([2,6],x,yMax,50),(([3],x,yMin,50)),([1,5],x,yMin,110),([4],x,yMax,110)])
+        #pose les pattes 2 3 6 et leve 1 4 5
+        MoveSelectedLegs([([2,6],x,yMax,110),(([3],x,yMin,110)),([1,5],x,yMin,50),([4],x,yMax,50)])
+        #recule les pattes 2 3 6 et avance 1 4 5
+        MoveSelectedLegs([([2,6],x,yMin,110),(([3],x,yMax,110)),([1,5],x,yMax,50),([4],x,yMin,50)])
+        # pose les pattes 1 4 5 et leve 2 3 6
+        MoveSelectedLegs([([2,6],x,yMax,50),(([3],x,yMin,50)),([1,5],x,yMin,110),([4],x,yMax,110)])
+    Grounded(True)
+    print("fini de marcher en crab")
+
+
+
+def Grounded(isUp):
     """
     initialisation de la position des pattes (ventre au sol + pattes au sol)
         
     """
-    MoveSelectedLegs([([1,2,3,4,5,6],0,70,50)])
+    # se relever
+    if(isUp == True):
+        MoveSelectedLegs([([1,2,3,4,5,6],0,cEcartY,-100)])
+    else:
+        MoveSelectedLegs([([1,2,3,4,5,6],0,cEcartY,0)])
 
-def StopMoving():
-    """
-    revenir à une position initial debout
-        
-    """
-    lst = [([1,2,3,4,5,6],0,70,110)]
-    MoveSelectedLegs(lst)    
 
 def MoveSelectedLegs(lst):
     """
@@ -137,7 +223,6 @@ def MoveSelectedLegs(lst):
 
     """
     threads = []
-    
     for numbers,x,y,z in lst :
         if(numbers.count(1) > 0):
             t = threading.Thread(target=LegFL.Proceed, args=(x,y,z))
@@ -157,37 +242,12 @@ def MoveSelectedLegs(lst):
         if(numbers.count(6) > 0):
             t = threading.Thread(target=LegBR.Proceed, args=(x,y,z))
             threads.append(t)
-    
     # Start each thread
     for t in threads:
         t.start()
-
     # Wait for all threads to finish
     for t in threads:
         t.join()
-
-#-----------------------------------------------------------------------------------------------------------------------------------------------------------#
-
-def Start():
-    """
-    Entrée principal du script
-        
-    """
-    try:
-        print("Hexapod ON")
-        Init(False)
-        time.sleep(1)
-        Grounded()
-        Controller()
-        #listen_keyboard(on_press=On_key_press)
-    except KeyboardInterrupt:
-        Init(True)
-    finally:
-        print("Hexapod OFF")
-        Init(True)
-        # quitteur le programme
-        sys.exit() 
-
 
 def Init(isGroundedBefore):
     """
@@ -195,14 +255,13 @@ def Init(isGroundedBefore):
         
     """
     if(isGroundedBefore is True):
-        Grounded()
-
-    LegFL.SetAngles(90,0,10)
-    LegML.SetAngles(90,0,10)
-    LegBL.SetAngles(90,0,10)
-    LegFR.SetAngles(90,0,10)
-    LegMR.SetAngles(90,0,10)
-    LegBR.SetAngles(90,0,10)
+        Grounded(False)
+    LegFL.SetAngles(90,0,00)
+    LegML.SetAngles(90,0,00)
+    LegBL.SetAngles(90,0,00)
+    LegFR.SetAngles(90,0,00)
+    LegMR.SetAngles(90,0,00)
+    LegBR.SetAngles(90,0,00)
 
 
 def On_key_press(key):
@@ -210,38 +269,13 @@ def On_key_press(key):
     Lecture clavier
         
     """
-    global STARTSTOP
     print(f"press : {key}")
 
     if(key == "i"):
         Init(True)
-
-    elif(key == "d"):
-        STARTSTOP = True
-        Walk()
-
-    elif(key == "g"):
-        Grounded()
-    
-    elif(key == "c"):
-        y = 100
-        z= 50
-        while(z > 0):
-            time.sleep(1)
-            z-=1
-            print(z)
-            LegFL.Transform(0,y,z)
-            LegML.Transform(0,y,z)
-            LegFR.Transform(0,y,z)
-            LegMR.Transform(0,y,z)
-            LegBL.Transform(0,y,z)
-            LegBR.Transform(0,y,z)
-
     elif(key == "s"):
-        STARTSTOP = False
-        #Init()
-        #sys.exit()
-
+        Init()
+        sys.exit()
     else:
         sys.exit()
 
@@ -259,7 +293,24 @@ def adjustServo():
     time.sleep(2)
 ''' 
 
-
+def Start():
+    """
+    Entrée principal du script
+        
+    """
+    try:
+        print("Hexapod ON")
+        Init(True)
+        Grounded(False)        
+        Controller()
+        #listen_keyboard(on_press=On_key_press)
+    except KeyboardInterrupt:
+        Init(False)
+    finally:
+        print("Hexapod OFF")
+        Init(True)
+        # quitteur le programme
+        sys.exit() 
 
 if __name__ == "__main__":
     Start()

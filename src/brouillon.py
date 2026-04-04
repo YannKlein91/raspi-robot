@@ -8,7 +8,49 @@
 
 
 
+
+
 """
+
+
+
+        démarche 4 temps
+
+        #avance les pattes 2 3 6 et recule 1 4 5
+        MoveSelectedLegs([([2,3,6],x,y,50),([1,4,5],-x,y,110)])
+
+        #pose les pattes 2 3 6 et leve 1 4 5
+        MoveSelectedLegs([([2,3,6],x,y,110),([1,4,5],-x,y,50)])
+
+        #recule les pattes 2 3 6 et avance 1 4 5
+        MoveSelectedLegs([([2,3,6],-x,y,110),([1,4,5],x,y,50)])
+
+        # pose les pattes 1 4 5 et leve 2 3 6
+        MoveSelectedLegs([([1,4,5],x,y,110),([2,3,6],-x,y,50)])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     time.sleep(1)
 
         # move one side
