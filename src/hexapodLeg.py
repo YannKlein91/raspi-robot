@@ -1,14 +1,20 @@
-from math import acos,atan2,sqrt,degrees,pi
+from math import acos,atan2,sqrt,pi
 import time
 
-cSpeed = 0.009#0.003 #vitesse de mouvement d'une patte
-cCoxaLenght = 45 #longueur coxa
-cFemurLenght = 80 #longueur femur
-cTibiaLenght = 140 #longueur tibia
-cFemurMountAngle = 43 #angle d'installation du servo-moteur gérant le femur
-cTibiaMountAngle = 4 #angle d'installation du servo-moteur gérant le tibia
-
 class Leg:
+    """
+    constantes
+
+    """
+    cSpeed = 0.009#0.003 #vitesse de mouvement d'une patte
+    cCoxaLenght = 45 #longueur coxa
+    cFemurLenght = 80 #longueur femur
+    cTibiaLenght = 140 #longueur tibia
+    cFemurMountAngle = 43 #angle d'installation du servo-moteur gérant le femur
+    cTibiaMountAngle = 4 #angle d'installation du servo-moteur gérant le tibia
+    cStepLenght = 30 # longueur d'un pas
+    cEcartY = 110 # écartement des pattes
+
     """
     définition d'une patte
         
@@ -45,7 +51,7 @@ class Leg:
         self.Femur = femur
         self.Tibia = tibia
         self.X = 0
-        self.Y = 110
+        self.Y = Leg.cEcartY
         self.Z = 0
 
         
@@ -80,17 +86,21 @@ class Leg:
         déplacement directe à une coordonné x,y,z
         avec : 
             * ajustement de la coordoné x des pattes selon : avant / arrière
-            * ajustement de l'instalation des 45° des pattes avants / arrière
+            * ajustement de l'instalation de 45° des pattes avants / arrière
         
         """
         self.X = x
         self.Y = y
         self.Z = z
+        
         ajustCoxa = 0
         if(self.AjustCoorDir == 1):
             ajustCoxa += 45
+            x = x + Leg.cStepLenght
         elif(self.AjustCoorDir == -1):
             ajustCoxa -= 45
+            x = x - Leg.cStepLenght
+        
         angles = self.Inverse_kinematics([x,y,z])
         self.SetAngles(angles[0] + ajustCoxa, angles[1], angles[2])
 
@@ -112,7 +122,7 @@ class Leg:
                 self.Z -= 1
             elif(self.Z < z):
                 self.Z += 1
-            time.sleep(cSpeed) #vitesse de mouvement de la patte
+            time.sleep(self.cSpeed) #vitesse de mouvement de la patte
             self.Transform(self.X,self.Y,self.Z)
         
     @staticmethod
@@ -129,17 +139,17 @@ class Leg:
         x += 0.00000001
 
         try:
-            if(sqrt(x**2 + y**2 + z**2) > cFemurLenght + cTibiaLenght):
+            if(sqrt(x**2 + y**2 + z**2) > Leg.cFemurLenght + Leg.cTibiaLenght):
                 print("!!! Coordonnées Inatteignable !!!")
         
             d = sqrt(x **2 + y**2)
-            r = d - cCoxaLenght
+            r = d - Leg.cCoxaLenght
             c = sqrt(z**2 + r**2)
         
             # calcule des angles en degrés
             theta1 = atan2(y, x) * 180.0 / pi
-            theta2 = 180 - ( atan2(r,-z) * 180.0 / pi + acos((cFemurLenght**2 + c**2 - cTibiaLenght**2) / (2 * cFemurLenght * c)) * 180.0 / pi ) + cFemurMountAngle 
-            theta3 = (acos((cFemurLenght**2 + cTibiaLenght**2 - c**2) / (2 * cFemurLenght * cTibiaLenght)) * 180.0 / pi) - cTibiaMountAngle
+            theta2 = 180 - ( atan2(r,-z) * 180.0 / pi + acos((Leg.cFemurLenght**2 + c**2 - Leg.cTibiaLenght**2) / (2 * Leg.cFemurLenght * c)) * 180.0 / pi ) + Leg.cFemurMountAngle 
+            theta3 = (acos((Leg.cFemurLenght**2 + Leg.cTibiaLenght**2 - c**2) / (2 * Leg.cFemurLenght * Leg.cTibiaLenght)) * 180.0 / pi) - Leg.cTibiaMountAngle
             
             if __debug__:
                 print(f"x = {x:.2f} , y = {y:.2f} , z = {z:.2f}")
@@ -148,7 +158,7 @@ class Leg:
             return (theta1,theta2,theta3)
         
         except:
-            print("!!!!!!!!!!!!!!  Inverse_kinematics : échec de calcules   !!!!!!!!!!!!!!!!!!")
+            print(f"!!!  Inverse_kinematics : échec de calcules avec x = {x} / y = {y} / z = {z}  !!!")
             # retourne la position de patte initial
             return 90,0,10
         
